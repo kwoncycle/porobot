@@ -6,7 +6,23 @@ from dotenv import load_dotenv
 _CUSTOM_EMOJI_RE = re.compile(r"<a?:([A-Za-z0-9_]+):\d+>")
 TARGET_HANDLE = "hj_roh".lower()  # the handle you want to react to
 
-async def react_if_hj_roh(message: discord.Message) -> bool:
+
+load_dotenv()
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+intents = discord.Intents.default()
+intents.message_content = True  # Required to read message text
+
+client = discord.Client(intents=intents)
+
+async def react_for_emojis(message: discord.Message) -> bool:
+    """
+    Reacts when the message includes certain custom emojis:
+      - If ANY emoji name contains 'poro_ggang' → 🤬
+      - Else if ANY emoji name contains 'ggang', 'kyaru_out', or 'byeongmin_ppak' → 🥰
+      - Else → no reaction
+    """
+
     """
     If the sender's handle (username/global/display name) contains 'hj_roh',
     react with 🖕 (middle_finger).
@@ -28,24 +44,6 @@ async def react_if_hj_roh(message: discord.Message) -> bool:
         except discord.HTTPException as e:
             print(f"⚠️ reaction failed: {e}")
             return False
-    return False
-
-
-load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
-
-intents = discord.Intents.default()
-intents.message_content = True  # Required to read message text
-
-client = discord.Client(intents=intents)
-
-async def react_for_emojis(message: discord.Message) -> bool:
-    """
-    Reacts when the message includes certain custom emojis:
-      - If ANY emoji name contains 'poro_ggang' → 🤬
-      - Else if ANY emoji name contains 'ggang', 'kyaru_out', or 'byeongmin_ppak' → 🥰
-      - Else → no reaction
-    """
 
     # collect all custom emoji names from the message
     if hasattr(message, "emojis") and message.emojis:
@@ -92,8 +90,6 @@ async def on_message(message):
         return
     
     await react_for_emojis(message)
-    await react_if_hj_roh(message)
-
     # if message.content.lower() == "!ping":
     #     await message.channel.send("🏓 Pong!")
     # if "fault" in message.content.lower():
