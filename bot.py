@@ -4,6 +4,32 @@ import re
 from dotenv import load_dotenv
 
 _CUSTOM_EMOJI_RE = re.compile(r"<a?:([A-Za-z0-9_]+):\d+>")
+TARGET_HANDLE = "hj_roh".lower()  # the handle you want to react to
+
+async def react_if_hj_roh(message: discord.Message) -> bool:
+    """
+    If the sender's handle (username/global/display name) contains 'hj_roh',
+    react with 🖕 (middle_finger).
+    """
+    author = message.author
+
+    # collect all name forms that can appear
+    candidates = {
+        (author.global_name or "").lower(),
+        (author.name or "").lower(),
+        (getattr(author, "display_name", "") or "").lower(),
+    }
+
+    if any(TARGET_HANDLE in n for n in candidates if n):
+        try:
+            await message.add_reaction("🖕")
+            print(f"🖕 reacted to message from {author}: {message.content}")
+            return True
+        except discord.HTTPException as e:
+            print(f"⚠️ reaction failed: {e}")
+            return False
+    return False
+
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -13,39 +39,46 @@ intents.message_content = True  # Required to read message text
 
 client = discord.Client(intents=intents)
 
-async def react_to_ggang(message: discord.Message) -> bool:
+async def react_for_emojis(message: discord.Message) -> bool:
     """
-    Reacts only if the message contains a **custom emoji** whose **name** contains 'ggang'.
-    - If any such emoji's name contains 'poro_ggang' -> react with 🤬 (face_with_symbols_over_mouth)
-    - Else (still contains 'ggang' in some emoji name) -> react with 🥰 (smiling_face_with_3_hearts)
-    Returns True if a reaction was added, else False.
+    Reacts when the message includes certain custom emojis:
+      - If ANY emoji name contains 'poro_ggang' → 🤬
+      - Else if ANY emoji name contains 'ggang', 'kyaru_out', or 'byeongmin_ppak' → 🥰
+      - Else → no reaction
     """
-    # 1) collect custom emoji names in the message
-    emoji_names = []
 
-    # Preferred: discord.py provides custom emojis used in the message
+    # collect all custom emoji names from the message
     if hasattr(message, "emojis") and message.emojis:
-        emoji_names = [(e.name or "") for e in message.emojis]
+        emoji_names = [e.name.lower() for e in message.emojis]
     else:
-        # Fallback: parse text for <:name:id> / <a:name:id>
-        emoji_names = _CUSTOM_EMOJI_RE.findall(message.content or "")
+        emoji_names = [n.lower() for n in _CUSTOM_EMOJI_RE.findall(message.content)]
 
-    names_lower = [n.lower() for n in emoji_names]
-    # 2) only proceed if at least one emoji name contains 'ggang'
-    ggang_names = [n for n in names_lower if "ggang" in n]
-    if not ggang_names:
+    if not emoji_names:
         return False
 
-    # 3) priority: if ANY emoji name contains 'poro_ggang' -> angry, else hearts
-    reaction = "🤬" if any("poro_ggang" in n for n in ggang_names) else "🥰"
+    # priority logic
+    has_other_trigger = any(
+        ("ggang" in n)
+        or ("out" in n)
+        or ("byeongmin_ppak" in n)
+        or ("poro" in n)
+        or ("kaorin" in n)
+        for n in emoji_names
+    )
+
+    reaction = None
+    if has_other_trigger:
+        reaction = "🥰"
+
+    if not reaction:
+        return False
 
     try:
         await message.add_reaction(reaction)
+        print(f"✅ reacted {reaction} to: {message.content}")
         return True
-    except discord.Forbidden:
-        # missing Add Reactions permission
-        return False
-    except discord.HTTPException:
+    except discord.HTTPException as e:
+        print(f"⚠️ failed to react: {e}")
         return False
 
 
@@ -58,8 +91,8 @@ async def on_message(message):
     if message.author == client.user:
         return
     
-    await react_to_ggang(message)
-
+    await react_for_emojis(message)
+    await react_if_hj_roh(message)
 
     # if message.content.lower() == "!ping":
     #     await message.channel.send("🏓 Pong!")
